@@ -201,8 +201,8 @@ void clock_stopwatch_pause(void) {
     }
     
     g_stopwatch_running = 0;
-    printf("Stopwatch paused at %u.%03u seconds\n", 
-           g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+    printf("Stopwatch paused at %02u.%02u seconds (%u ms)\n", 
+           g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
     
     // 更新显示确保最终值显示正确
     display_update_stopwatch(g_stopwatch_ms);
@@ -217,8 +217,8 @@ void clock_stopwatch_reset(void) {
         return;
     }
     
-    printf("Stopwatch reset from %u.%03u seconds to 0.000\n", 
-           g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+    printf("Stopwatch reset from %02u.%02u seconds to 00.00\n", 
+           g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10);
     
     g_stopwatch_running = 0;
     g_stopwatch_ms = 0;
@@ -238,14 +238,18 @@ int clock_stopwatch_save_record(uint8_t record_id) {
         return -1;
     }
     
+    // 输出当前秒表的值，格式为：秒.厘秒
+    printf("Saving stopwatch record: %02u.%02u seconds (%u ms)\n", 
+           g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
+           
     int ret = storage_save_record(record_id, g_stopwatch_ms);
     if (ret != 0) {
         printf("Failed to save stopwatch record\n");
         return -1;
     }
     
-    printf("Stopwatch record #%u saved: %u.%03u seconds\n", 
-           record_id, g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+    printf("Stopwatch record #%u saved: %02u.%02u seconds\n", 
+           record_id, g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10);
     return 0;
 }
 
@@ -339,21 +343,15 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
                 // 使用实际经过的时间更新秒表，而不是假设固定10ms
                 g_stopwatch_ms += elapsed_ms;
                 
-                // 每50ms更新一次显示，提高性能
-                if (tick_count % 5 == 0) {
-                    display_update_stopwatch(g_stopwatch_ms);
-                    
-                    // 每秒输出一次当前秒表值，便于调试
-                    if (tick_count % 100 == 0) {
-                        printf("Stopwatch running: %u.%03u seconds\n", 
-                               g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
-                    }
+                // 每10ms更新一次显示，提高精度
+                display_update_stopwatch(g_stopwatch_ms);
+                
+                // 每秒输出一次当前秒表值，便于调试
+                if (++tick_count >= 100) {
+                    tick_count = 0;
+                    printf("Stopwatch running: %02u.%02u seconds (%u ms)\n", 
+                           g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
                 }
-            }
-            
-            // 更新计数器
-            if (++tick_count >= 100) {
-                tick_count = 0;
             }
             break;
             

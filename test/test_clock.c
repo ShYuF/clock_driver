@@ -97,7 +97,6 @@ void* keypad_simulation_thread(void *arg) {
     pc104_sim_set_behavior(3, 1, 3);
     keypad_poll();
     sleep(1);
-    test_printf("[测试] 注意: 设置分钟会自动将秒清零\n");
     
     // 第4步：返回正常模式
     test_printf("[测试] 模拟按下按键1 - 返回正常模式\n");

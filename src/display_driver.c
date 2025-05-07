@@ -270,23 +270,26 @@ void display_update_time(const rtc_time_t *time) {
  * @param milliseconds 要显示的毫秒数
  */
 void display_update_stopwatch(uint32_t milliseconds) {
-    uint8_t minutes, seconds;
+    uint8_t seconds, centiseconds;
     
     if (g_current_display_mode != DISPLAY_MODE_STOPWATCH) {
         return;
     }
     
-    // 计算分钟和秒
-    seconds = (milliseconds / 1000) % 60;
-    minutes = (milliseconds / 60000) % 100; // 限制在0-99分钟
+    // 计算秒和百分之一秒(厘秒)
+    seconds = (milliseconds / 1000) % 100; // 限制在0-99秒
+    centiseconds = (milliseconds % 1000) / 10; // 将毫秒转换为百分之一秒(保留两位)
     
-    // 显示分钟的十位和个位
-    display_set_digit(DISPLAY_DIGIT_3, minutes / 10, 0);
-    display_set_digit(DISPLAY_DIGIT_2, minutes % 10, 1); // 带小数点分隔
+    printf("Stopwatch display: %02d.%02d seconds (%u ms)\n", 
+           seconds, centiseconds, milliseconds);
     
-    // 显示秒钟的十位和个位
-    display_set_digit(DISPLAY_DIGIT_1, seconds / 10, 0);
-    display_set_digit(DISPLAY_DIGIT_0, seconds % 10, 0);
+    // 显示秒的十位和个位
+    display_set_digit(DISPLAY_DIGIT_3, seconds / 10, 0);
+    display_set_digit(DISPLAY_DIGIT_2, seconds % 10, 1); // 带小数点分隔
+    
+    // 显示厘秒(百分之一秒)的十位和个位
+    display_set_digit(DISPLAY_DIGIT_1, centiseconds / 10, 0);
+    display_set_digit(DISPLAY_DIGIT_0, centiseconds % 10, 0);
 }
 
 /**

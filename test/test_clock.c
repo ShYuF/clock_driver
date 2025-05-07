@@ -37,34 +37,73 @@ void setup_signal_handlers(void) {
  * 该线程定期模拟按键操作，测试电子钟响应
  */
 void* keypad_simulation_thread(void *arg) {
-    int key_sequence[] = {1, 2, 2, 3, 4, 1}; // 模拟按键序列
-    int key_count = sizeof(key_sequence) / sizeof(key_sequence[0]);
-    int current_key = 0;
-    
     printf("[测试] 按键模拟线程启动\n");
     
-    while (g_running) {
-        // 等待3秒后开始模拟按键
-        sleep(3);
-        
-        if (!g_running) break;
-        
-        // 模拟按键
-        int key = key_sequence[current_key];
-        printf("[测试] 模拟按下按键 %d\n", key);
-        
-        // 设置按键行为
-        pc104_sim_set_behavior(3, 1, key); // 设备3是按键设备，行为1表示按键按下事件
-        
-        // 触发按键轮询
-        keypad_poll();
-        
-        // 移动到下一个按键
-        current_key = (current_key + 1) % key_count;
-        
-        // 等待按键处理完成
-        usleep(500000); // 0.5秒
-    }
+    // 等待3秒，让系统初始化
+    sleep(3);
+    
+    // 第1步：进入时间设置模式
+    printf("[测试] 模拟按下按键1 - 进入设置模式\n");
+    pc104_sim_set_behavior(3, 1, 1);
+    keypad_poll();
+    sleep(1);
+    
+    // 第2步：设置小时+1
+    printf("[测试] 模拟按下按键2 - 小时+1\n");
+    pc104_sim_set_behavior(3, 1, 2);
+    keypad_poll();
+    sleep(1);
+    
+    // 第3步：设置分钟+1
+    printf("[测试] 模拟按下按键3 - 分钟+1\n"); 
+    pc104_sim_set_behavior(3, 1, 3);
+    keypad_poll();
+    sleep(1);
+    
+    // 第4步：返回正常模式
+    printf("[测试] 模拟按下按键1 - 返回正常模式\n");
+    pc104_sim_set_behavior(3, 1, 1);
+    keypad_poll();
+    sleep(2);
+    
+    // 第5步：进入秒表模式
+    printf("[测试] 模拟按下按键2 - 进入秒表模式\n");
+    pc104_sim_set_behavior(3, 1, 2);
+    keypad_poll();
+    sleep(1);
+    
+    // 第6步：启动秒表
+    printf("[测试] 模拟按下按键2 - 启动秒表\n");
+    pc104_sim_set_behavior(3, 1, 2);
+    keypad_poll();
+    sleep(2); // 让秒表运行2秒
+    
+    // 第7步：保存秒表记录
+    printf("[测试] 模拟按下按键3 - 保存秒表记录\n");
+    pc104_sim_set_behavior(3, 1, 3);
+    keypad_poll();
+    sleep(1);
+    
+    // 第8步：暂停秒表
+    printf("[测试] 模拟按下按键2 - 暂停秒表\n");
+    pc104_sim_set_behavior(3, 1, 2);
+    keypad_poll();
+    sleep(1);
+    
+    // 第9步：复位秒表（在秒表暂停状态下按3）
+    printf("[测试] 模拟按下按键3 - 复位秒表\n");
+    pc104_sim_set_behavior(3, 1, 3);
+    keypad_poll();
+    sleep(1);
+    
+    // 第10步：返回正常模式
+    printf("[测试] 模拟按下按键1 - 返回正常模式\n");
+    pc104_sim_set_behavior(3, 1, 1);
+    keypad_poll();
+    
+    printf("[测试] 按键模拟测试序列完成\n");
+    
+    // 测试完成后不再随机测试，避免干扰结果观察
     
     printf("[测试] 按键模拟线程退出\n");
     return NULL;

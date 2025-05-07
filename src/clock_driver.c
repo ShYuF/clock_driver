@@ -296,6 +296,14 @@ void clock_keypad_callback(uint8_t key_code, key_event_t event) {
         return;
     }
     
+    printf("Keypad button %d pressed in mode %d\n", key_code, g_current_mode);
+    
+    // 确保按键编码在有效范围内（1-3）
+    if (key_code < 1 || key_code > 3) {
+        printf("Invalid key code: %d\n", key_code);
+        return;
+    }
+    
     // 根据当前模式处理按键
     switch (g_current_mode) {
         case CLOCK_MODE_NORMAL:
@@ -309,7 +317,9 @@ void clock_keypad_callback(uint8_t key_code, key_event_t event) {
                     clock_set_mode(CLOCK_MODE_STOPWATCH);
                     break;
                     
-                default:
+                case 3: // 3号键在普通模式下无特殊功能
+                    // 可以添加额外功能，如背光控制等
+                    printf("Key 3 pressed in normal mode - no action defined\n");
                     break;
             }
             break;
@@ -328,15 +338,8 @@ void clock_keypad_callback(uint8_t key_code, key_event_t event) {
                     
                 case 3: // 3号键为分钟增加键
                     g_current_time.minute = (g_current_time.minute + 1) % 60;
+                    g_current_time.second = 0; // 重置秒钟，更符合用户设置时间的预期
                     clock_set_time(&g_current_time);
-                    break;
-                    
-                case 4: // 4号键为秒钟增加键
-                    g_current_time.second = (g_current_time.second + 1) % 60;
-                    clock_set_time(&g_current_time);
-                    break;
-                    
-                default:
                     break;
             }
             break;
@@ -356,15 +359,14 @@ void clock_keypad_callback(uint8_t key_code, key_event_t event) {
                     }
                     break;
                     
-                case 3: // 3号键为复位键
-                    clock_stopwatch_reset();
-                    break;
-                    
-                case 4: // 4号键为记录键
-                    clock_stopwatch_save_record(0); // 保存到0号记录
-                    break;
-                    
-                default:
+                case 3: // 3号键为复位/保存记录键
+                    if (g_stopwatch_running) {
+                        // 运行中保存记录
+                        clock_stopwatch_save_record(0);
+                    } else {
+                        // 停止时复位秒表
+                        clock_stopwatch_reset();
+                    }
                     break;
             }
             break;

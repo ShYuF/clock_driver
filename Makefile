@@ -5,9 +5,10 @@ LDFLAGS = -lpthread
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
+
 TEST_DIR = test
 TEST_OBJ_DIR = $(OBJ_DIR)/test
-TEST_BIN_DIR = $(BIN_DIR)/test
+TEST_BIN_DIR = $(BIN_DIR)
 
 SOURCES = $(wildcard $(SRC_DIR)/*.c)
 OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))

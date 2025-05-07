@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <time.h>
+#include <stdarg.h>
 
 // 退出标志，用于控制主循环退出
 static volatile int g_running = 1;
@@ -20,7 +21,7 @@ static int g_test_duration = 0;
 static FILE* g_log_file = NULL;
 
 /**
- * @brief 定制化打印函数，根据配置输出到终端或日志文件
+ * @brief 定制化输出函数，根据配置输出到终端或日志文件
  * 
  * @param format 格式化字符串
  * @param ... 可变参数列表

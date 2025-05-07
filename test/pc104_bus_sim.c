@@ -2,6 +2,8 @@
 #include "pc104_simulator.h"
 #include <stdio.h>
 
+// 使用条件编译，当构建测试版本时替换原始PC104函数
+#ifdef USE_PC104_SIMULATION
 /**
  * @brief 初始化PC104总线 - 模拟版本
  * 
@@ -64,3 +66,4 @@ int pc104_close(void) {
     printf("PC104 bus simulator closed\n");
     return 0;
 }
+#endif  // USE_PC104_SIMULATION

@@ -16,14 +16,18 @@ TARGET = $(BIN_DIR)/driver
 # 测试相关文件
 TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c, $(TEST_OBJ_DIR)/%.o, $(TEST_SOURCES))
-TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c, $(TEST_BIN_DIR)/%, $(TEST_SOURCES))
 
 # 模拟模式标志
 SIM_FLAG = -DUSE_PC104_SIMULATION
 
+# 单独的测试目标
+PC104_SIM_TEST = $(TEST_BIN_DIR)/test_pc104_sim
+CLOCK_TEST = $(TEST_BIN_DIR)/test_clock
+
 all: directories $(TARGET)
 
-test: directories test_directories $(TEST_TARGETS)
+# 测试目标依赖于所有的测试文件
+test: directories test_directories $(PC104_SIM_TEST) $(CLOCK_TEST)
 
 # 模拟模式构建目标
 sim: CFLAGS += $(SIM_FLAG)
@@ -41,13 +45,19 @@ directories:
 $(TARGET): $(OBJECTS)
 	$(GCC) $(LDFLAGS) -o $@ $^
 
-# 构建测试可执行文件，链接除了main.o以外的所有对象文件
-$(TEST_BIN_DIR)/%: $(TEST_OBJ_DIR)/%.o $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS))
+# PC104模拟器测试程序 - 使用模拟版本的PC104函数
+$(PC104_SIM_TEST): $(TEST_OBJ_DIR)/test_pc104_sim.o $(TEST_OBJ_DIR)/pc104_simulator.o
 	$(GCC) $(LDFLAGS) -o $@ $^
 
+# 电子钟测试程序 - 使用模拟版本的PC104驱动程序
+$(CLOCK_TEST): $(TEST_OBJ_DIR)/test_clock.o $(TEST_OBJ_DIR)/pc104_simulator.o $(TEST_OBJ_DIR)/pc104_bus_sim.o $(filter-out $(OBJ_DIR)/main.o $(OBJ_DIR)/pc104_bus.o, $(OBJECTS))
+	$(GCC) $(LDFLAGS) -o $@ $^
+
+# 测试对象文件编译规则
 $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
 	$(GCC) $(CFLAGS) -c -o $@ $<
 
+# 源代码对象文件编译规则
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(GCC) $(CFLAGS) -c -o $@ $<
 

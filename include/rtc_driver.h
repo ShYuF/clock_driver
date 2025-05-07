@@ -23,5 +23,6 @@ typedef struct {
 int rtc_init(void);
 int rtc_get_time(rtc_time_t *time);
 int rtc_set_time(const rtc_time_t *time);
+int rtc_close(void);
 
 #endif

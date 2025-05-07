@@ -44,49 +44,12 @@ typedef enum {
     DISPLAY_MODE_STOPWATCH  // 秒表模式
 } display_mode_t;
 
-/**
- * @brief 初始化显示模块
- * 
- * @return 0表示成功，-1表示失败
- */
 int display_init(void);
-
-/**
- * @brief 更新显示的时间
- * 
- * @param time 要显示的时间
- */
 void display_update_time(const rtc_time_t *time);
-
-/**
- * @brief 更新秒表显示
- * 
- * @param milliseconds 要显示的毫秒数
- */
 void display_update_stopwatch(uint32_t milliseconds);
-
-/**
- * @brief 设置显示模式
- * 
- * @param mode 显示模式
- */
 void display_set_mode(display_mode_t mode);
-
-/**
- * @brief 设置数字在指定数码管位置显示
- * 
- * @param position 数码管位置(0-3)
- * @param digit 要显示的数字(0-9)
- * @param dp 是否显示小数点
- * @return 0表示成功，-1表示失败
- */
 int display_set_digit(uint8_t position, uint8_t digit, uint8_t dp);
-
-/**
- * @brief 设置编辑位置闪烁
- * 
- * @param position 闪烁的数码管位置
- */
 void display_set_blink_position(uint8_t position);
+int display_close(void);
 
 #endif

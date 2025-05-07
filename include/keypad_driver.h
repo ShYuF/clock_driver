@@ -35,5 +35,5 @@ typedef void (*key_callback_t)(uint8_t key_code, key_event_t event);
 int keypad_init(void);
 void keypad_register_callback(key_callback_t callback);
 void keypad_poll(void);
-
+int keypad_close(void);
 #endif

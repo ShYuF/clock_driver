@@ -27,5 +27,6 @@ int interrupt_init(void);
 int interrupt_register_handler(interrupt_type_t type, interrupt_callback_t callback);
 void interrupt_enable(interrupt_type_t type);
 void interrupt_disable(interrupt_type_t type);
+int interrupt_close(void);
 
 #endif

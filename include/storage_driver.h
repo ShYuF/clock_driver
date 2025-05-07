@@ -34,5 +34,6 @@ int storage_read(uint16_t addr, uint8_t *buffer, uint16_t size);
 int storage_write(uint16_t addr, const uint8_t *buffer, uint16_t size);
 int storage_save_record(uint8_t record_id, uint32_t time_ms);
 int storage_read_record(uint8_t record_id, uint32_t *time_ms);
+int storage_close(void);
 
 #endif

@@ -110,6 +110,17 @@ void clock_stop(void) {
  * @return 0表示成功，-1表示失败
  */
 int clock_set_time(const rtc_time_t *time) {
+    rtc_time_t old_time;
+    
+    if (time == NULL) {
+        printf("Failed to set time: NULL pointer\n");
+        return -1;
+    }
+    
+    // 保存旧的时间值以便进行比较
+    memcpy(&old_time, &g_current_time, sizeof(rtc_time_t));
+    
+    // 设置RTC的时间
     int ret = rtc_set_time(time);
     if (ret != 0) {
         printf("Failed to set RTC time\n");
@@ -122,10 +133,17 @@ int clock_set_time(const rtc_time_t *time) {
     // 更新显示
     display_update_time(&g_current_time);
     
-    printf("RTC time set to %02d:%02d:%02d\n", 
+    // 输出详细日志，包括哪些时间单位被更改
+    printf("RTC time set from %02d:%02d:%02d to %02d:%02d:%02d\n", 
+           old_time.hour, old_time.minute, old_time.second,
            time->hour, time->minute, time->second);
-    printf("Clock time set to %02d:%02d:%02d\n", 
-           g_current_time.hour, g_current_time.minute, g_current_time.second);
+    
+    // 提示用户秒钟被重置的场景
+    if (old_time.second != 0 && time->second == 0 && 
+        (old_time.hour != time->hour || old_time.minute != time->minute)) {
+        printf("Note: Seconds reset to 00 as part of time adjustment\n");
+    }
+    
     return 0;
 }
 
@@ -398,7 +416,6 @@ void clock_keypad_callback(uint8_t key_code, key_event_t event) {
                     
                 case 3: // 3号键为分钟增加键
                     g_current_time.minute = (g_current_time.minute + 1) % 60;
-                    g_current_time.second = 0; // 重置秒钟，更符合用户设置时间的预期
                     clock_set_time(&g_current_time);
                     break;
             }

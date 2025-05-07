@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <pthread.h>
-#include <pthread_time.h>
-
 #ifdef __linux__
     #define PLATFORM_LINUX
 
@@ -18,6 +15,7 @@
         #include <sys/ioctl.h>
         #include <sys/mman.h>
         #include <sys/io.h>
+        #include <pthread.h>
     #endif
 
     #ifdef __KERNEL__
@@ -41,6 +39,8 @@
 #elif defined(_WIN32) || defined(_WIN64)
     #define PLATFORM_WINDOWS
     #include <windows.h>
+    #include <pthread.h>
+    #include <pthread_time.h>
 #else
     #define PLATFORM_UNKNOWN
 #endif

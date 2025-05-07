@@ -1,5 +1,11 @@
 #include "pc104_simulator.h"
 #include "pc104_bus.h"
+#include "rtc_driver.h"
+#include "keypad_driver.h"
+#include "interrupt_handler.h"
+#include "storage_driver.h"
+#include "display_driver.h"
+
 #include <time.h>
 #include <pthread.h>
 

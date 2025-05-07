@@ -37,6 +37,14 @@ static int display_wait_ready(void) {
     do {
         status = pc104_read_reg(DISPLAY_STATUS_REG);
         
+        // 0xFF可能是未初始化状态，尝试重置
+        if (status == 0xFF) {
+            // 发送清屏命令尝试重置显示器
+            pc104_write_reg(DISPLAY_CTRL_REG, DISPLAY_CTRL_CLEAR);
+            usleep(10000);  // 等待10ms让设备有时间响应
+            continue;
+        }
+        
         // 检查错误状态
         if (status & DISPLAY_STATUS_ERROR) {
             printf("Display error detected: status=0x%02X\n", status);

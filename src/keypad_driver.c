@@ -11,27 +11,41 @@ static uint8_t g_last_key_state = 0;          // 上一次按键状态
  * @return 0表示成功，-1表示失败
  */
 int keypad_init(void) {
+    int timeout = PC104_TIMEOUT;
     uint8_t status;
-    
-    // 读取状态寄存器
-    status = pc104_read_reg(KEYPAD_STATUS_REG);
-    if (status == (uint8_t)-1) {
-        printf("Failed to read keypad status register\n");
-        return -1;
-    }
-    
-    // 检查是否有错误状态
-    if (status & KEYPAD_STATUS_ERROR) {
-        printf("Keypad module in error state\n");
-        // 清除错误状态 - 写入控制寄存器的复位命令（通常为0）
-        pc104_write_reg(KEYPAD_CONTROL_REG, 0);
-    }
-    
-    // 启用按键模块
-    if (pc104_write_reg(KEYPAD_CONTROL_REG, KEYPAD_CTRL_ENABLE) != 0) {
-        printf("Failed to enable keypad module\n");
-        return -1;
-    }
+    do {
+        // 读取状态寄存器
+        status = pc104_read_reg(KEYPAD_STATUS_REG);
+        if (status == (uint8_t)-1) {
+            printf("Failed to read keypad status register\n");
+            return -1;
+        }
+        
+        if (status == 0xFF) {
+            printf("Keypad status register has initial value 0xFF, attempting reset\n");
+            // 重置按键模块
+            pc104_write_reg(KEYPAD_CONTROL_REG, 0);
+            usleep(10000); // 等待10ms让设备有时间响应
+            continue;
+        }
+
+        // 检查是否有错误状态
+        if (status & KEYPAD_STATUS_ERROR) {
+            printf("Keypad module in error state\n");
+            // 清除错误状态 - 写入控制寄存器的复位命令
+            pc104_write_reg(KEYPAD_CONTROL_REG, 0);
+            usleep(10000); // 等待10ms让设备有时间响应
+            continue;
+        }
+        
+        // 启用按键模块
+        if (pc104_write_reg(KEYPAD_CONTROL_REG, KEYPAD_CTRL_ENABLE) != 0) {
+            printf("Failed to enable keypad module\n");
+            return -1;
+        }
+        
+        break;
+    } while (--timeout > 0);
     
     // 初始化全局变量
     g_key_callback = NULL;

@@ -13,6 +13,14 @@ static int storage_wait_ready(void) {
     do {
         status = pc104_read_reg(STORAGE_STATUS_REG);
         
+        // 尝试处理0xFF初始状态
+        if (status == 0xFF) {
+            // 尝试发送命令复位存储器
+            pc104_write_reg(STORAGE_CTRL_REG, 0);
+            usleep(10000);  // 等待10ms
+            continue;
+        }
+        
         // 检查错误状态
         if (status & STORAGE_STATUS_ERROR) {
             printf("Storage error detected: status=0x%02X\n", status);

@@ -44,8 +44,12 @@ int pc104_sim_init(void) {
     memset(g_pc104_memory, 0xFF, sizeof(g_pc104_memory));
     memset(g_device_behavior, 0, sizeof(g_device_behavior));
     
-    // 设置PC104状态寄存器为正常状态（非忙，无错误）
+    // 设置各设备状态寄存器为正常状态（非忙，无错误）
     g_pc104_memory[PC104_STATUS_PORT - PC104_BASE_ADDR] = 0x00;
+    g_pc104_memory[DISPLAY_STATUS_REG - PC104_BASE_ADDR] = 0x00;
+    g_pc104_memory[KEYPAD_STATUS_REG - PC104_BASE_ADDR] = 0x00;
+    g_pc104_memory[STORAGE_STATUS_REG - PC104_BASE_ADDR] = 0x00;
+    g_pc104_memory[INT_CTRL_STATUS - PC104_BASE_ADDR] = 0x00;
     
     // 初始化RTC模拟
     time(&g_rtc_base_time);

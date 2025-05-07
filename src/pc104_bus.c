@@ -51,21 +51,22 @@ static int pc104_check_error(void) {
  */
 int pc104_init(void) {
     #ifdef PLATFORM_LINUX
-
-        // 在Linux系统下通过/dev/mem映射I/O端口
-        g_pc104_fd = open("/dev/mem", O_RDWR | O_SYNC);
+        // 在Linux系统下通过/dev/port访问I/O端口
+        g_pc104_fd = open("/dev/port", O_RDWR);
         if (g_pc104_fd < 0) {
-            perror("Failed to open /dev/mem");
+            perror("Failed to open /dev/port");
             return -1;
         }
         
-        g_pc104_io_mem = mmap(NULL, 4, PROT_READ | PROT_WRITE, MAP_SHARED, g_pc104_fd, PC104_BASE_ADDR);
-        if (g_pc104_io_mem == MAP_FAILED) {
-            perror("Failed to map I/O memory");
+        // 使用ioperm获取I/O端口访问权限（需要root权限）
+        if (ioperm(PC104_BASE_ADDR, 4, 1) < 0) {
+            perror("Failed to get I/O port permission");
             close(g_pc104_fd);
             g_pc104_fd = -1;
             return -1;
         }
+        
+        printf("I/O port permissions acquired successfully\n");
     #elif defined(PLATFORM_WINDOWS)
     #elif defined(PLATFORM_UNKNOWN)
     #else
@@ -164,10 +165,8 @@ int pc104_write_reg(uint16_t addr, uint8_t data) {
  */
 int pc104_close(void) {
     #ifdef PLATFORM_LINUX
-        if (g_pc104_io_mem != NULL) {
-            munmap(g_pc104_io_mem, 4);
-            g_pc104_io_mem = NULL;
-        }
+        // 释放I/O端口访问权限
+        ioperm(PC104_BASE_ADDR, 4, 0);
         
         if (g_pc104_fd >= 0) {
             close(g_pc104_fd);

@@ -175,11 +175,10 @@ void clock_stopwatch_start(void) {
         return;
     }
     
-    // 重置秒表计时器，如果从暂停状态继续则保留当前值
-    if (g_stopwatch_ms == 0) {
-        printf("Stopwatch started from 0.000 seconds\n");
-    } else {
-        printf("Stopwatch resumed from %u.%03u seconds\n", g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+    // 防止重复启动
+    if (g_stopwatch_running) {
+        printf("Stopwatch is already running, ignoring start command\n");
+        return;
     }
     
     // 重置计时器基准点，确保从当前时间开始计时
@@ -187,8 +186,19 @@ void clock_stopwatch_start(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     g_last_timer_tick = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
     
+    // 设置运行标志
     g_stopwatch_running = 1;
-    printf("Stopwatch started\n");
+    
+    // 根据当前值输出不同的启动信息
+    if (g_stopwatch_ms == 0) {
+        printf("Stopwatch started from 0.00 seconds\n");
+    } else {
+        printf("Stopwatch resumed from %02u.%02u seconds (%u ms)\n", 
+               g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
+    }
+    
+    // 确保立即更新一次显示
+    display_update_stopwatch(g_stopwatch_ms);
 }
 
 /**
@@ -200,7 +210,16 @@ void clock_stopwatch_pause(void) {
         return;
     }
     
+    // 防止重复暂停
+    if (!g_stopwatch_running) {
+        printf("Stopwatch is already paused, ignoring pause command\n");
+        return;
+    }
+    
+    // 清除运行标志
     g_stopwatch_running = 0;
+    
+    // 输出当前的秒表值
     printf("Stopwatch paused at %02u.%02u seconds (%u ms)\n", 
            g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
     
@@ -309,10 +328,26 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
     // 首次调用初始化last_tick
     if (g_last_timer_tick == 0) {
         g_last_timer_tick = current_tick;
+        return;  // 首次调用直接返回，避免计算错误的elapsed_ms
     }
     
-    // 计算实际经过的时间（毫秒）
-    uint32_t elapsed_ms = current_tick - g_last_timer_tick;
+    // 计算实际经过的时间（毫秒），防止负值
+    uint32_t elapsed_ms;
+    if (current_tick >= g_last_timer_tick) {
+        elapsed_ms = current_tick - g_last_timer_tick;
+    } else {
+        // 处理系统时间回绕的极端情况
+        printf("Warning: Timer rollover detected\n");
+        elapsed_ms = 10;  // 默认使用10ms
+    }
+    
+    // 限制单次增量不超过100ms，防止大幅跳变
+    if (elapsed_ms > 100) {
+        printf("Warning: Large elapsed time (%u ms), capping to 100ms\n", elapsed_ms);
+        elapsed_ms = 100;
+    }
+    
+    // 更新上次tick时间
     g_last_timer_tick = current_tick;
     
     // 每10ms调用一次
@@ -340,16 +375,24 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
         case CLOCK_MODE_STOPWATCH:
             // 秒表模式下的处理
             if (g_stopwatch_running) {
-                // 使用实际经过的时间更新秒表，而不是假设固定10ms
+                // 使用实际经过的时间更新秒表
                 g_stopwatch_ms += elapsed_ms;
                 
-                // 每10ms更新一次显示，提高精度
+                // 每次更新都刷新显示，提高精度
                 display_update_stopwatch(g_stopwatch_ms);
                 
                 // 每秒输出一次当前秒表值，便于调试
                 if (++tick_count >= 100) {
                     tick_count = 0;
                     printf("Stopwatch running: %02u.%02u seconds (%u ms)\n", 
+                           g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
+                }
+            } else {
+                // 即使秒表暂停，也要保持显示更新
+                if (++tick_count >= 100) {
+                    tick_count = 0;
+                    display_update_stopwatch(g_stopwatch_ms);
+                    printf("Stopwatch paused: %02u.%02u seconds (%u ms)\n", 
                            g_stopwatch_ms / 1000, (g_stopwatch_ms % 1000) / 10, g_stopwatch_ms);
                 }
             }
@@ -428,18 +471,22 @@ void clock_keypad_callback(uint8_t key_code, key_event_t event) {
                     
                 case 2: // 2号键为启动/暂停键
                     if (g_stopwatch_running) {
+                        // 当前正在运行，执行暂停操作
                         clock_stopwatch_pause();
                     } else {
+                        // 当前已暂停，执行启动操作
                         clock_stopwatch_start();
                     }
                     break;
                     
                 case 3: // 3号键为复位/保存记录键
                     if (g_stopwatch_running) {
-                        // 运行中保存记录
+                        // 运行中按3就是保存记录
+                        printf("Saving lap time while stopwatch is running\n");
                         clock_stopwatch_save_record(0);
                     } else {
-                        // 停止时复位秒表
+                        // 已暂停状态下按3就是复位秒表
+                        printf("Resetting stopwatch in paused state\n");
                         clock_stopwatch_reset();
                     }
                     break;

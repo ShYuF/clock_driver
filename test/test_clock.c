@@ -97,6 +97,7 @@ void* keypad_simulation_thread(void *arg) {
     pc104_sim_set_behavior(3, 1, 3);
     keypad_poll();
     sleep(1);
+    test_printf("[测试] 注意: 设置分钟会保留当前秒值\n");
     
     // 第4步：返回正常模式
     test_printf("[测试] 模拟按下按键1 - 返回正常模式\n");
@@ -111,18 +112,18 @@ void* keypad_simulation_thread(void *arg) {
     pc104_sim_set_behavior(3, 1, 2);
     keypad_poll();
     sleep(1);
-    test_printf("[测试] 秒表初始状态: 00:00\n");
+    test_printf("[测试] 秒表初始状态: 00.00\n");
     
     // 第6步：启动秒表
     test_printf("[测试] 模拟按下按键2 - 启动秒表\n");
     pc104_sim_set_behavior(3, 1, 2);
     keypad_poll();
     
-    // 让秒表运行约3秒
+    // 让秒表运行3秒
     test_printf("[测试] 秒表正在运行 - 等待3秒...\n");
     sleep(3); 
     
-    // 第7步：保存秒表记录
+    // 第7步：保存秒表记录 (记录当前值但继续计时)
     test_printf("[测试] 模拟按下按键3 - 保存秒表记录 (秒表仍在运行)\n");
     pc104_sim_set_behavior(3, 1, 3);
     keypad_poll();
@@ -133,12 +134,13 @@ void* keypad_simulation_thread(void *arg) {
     pc104_sim_set_behavior(3, 1, 2);
     keypad_poll();
     sleep(1);
+    test_printf("[测试] 检查暂停值是否约为4秒\n");
     
     // 第9步：复位秒表（在秒表暂停状态下按3）
     test_printf("[测试] 模拟按下按键3 - 复位秒表 (秒表已暂停)\n");
     pc104_sim_set_behavior(3, 1, 3);
     keypad_poll();
-    test_printf("[测试] 秒表已复位至 00:00\n");
+    test_printf("[测试] 秒表已复位至 00.00\n");
     sleep(1);
     
     // 第10步：再次启动秒表并等待一小段时间
@@ -146,6 +148,7 @@ void* keypad_simulation_thread(void *arg) {
     pc104_sim_set_behavior(3, 1, 2);
     keypad_poll();
     sleep(2);
+    test_printf("[测试] 秒表已运行约2秒\n");
     
     // 第11步：暂停秒表
     test_printf("[测试] 模拟按下按键2 - 再次暂停秒表\n");

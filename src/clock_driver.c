@@ -255,6 +255,7 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
     // 每10ms调用一次
     switch (g_current_mode) {
         case CLOCK_MODE_NORMAL:
+        case CLOCK_MODE_SETTING:
             // 每秒更新一次显示（100个10ms = 1秒）
             if (++tick_count >= 100) {
                 tick_count = 0;
@@ -264,18 +265,20 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
             break;
             
         case CLOCK_MODE_STOPWATCH:
+            // 秒表模式下的处理
             if (g_stopwatch_running) {
-                // 更新秒表计时（每10ms）
+                // 更新秒表计时（每10ms增加10ms）
                 g_stopwatch_ms += 10;
                 
-                // 每100ms更新显示（减少显示刷新频率）
+                // 每100ms更新一次显示（减少显示刷新频率）
                 if (tick_count % 10 == 0) {
                     display_update_stopwatch(g_stopwatch_ms);
                 }
-                
-                if (++tick_count >= 100) {
-                    tick_count = 0;
-                }
+            }
+            
+            // 不论秒表是否运行，都需要增加tick_count并在到达100时重置
+            if (++tick_count >= 100) {
+                tick_count = 0;
             }
             break;
             

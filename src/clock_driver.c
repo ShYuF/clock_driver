@@ -9,6 +9,7 @@ static clock_mode_t g_current_mode = CLOCK_MODE_NORMAL;  // 当前工作模式
 static uint32_t g_stopwatch_ms = 0;                      // 秒表计时（毫秒）
 static int g_stopwatch_running = 0;                      // 秒表运行状态标志
 static rtc_time_t g_current_time;                        // 当前时间缓存
+static uint32_t g_last_timer_tick = 0;                  // 上次定时器触发时间
 
 /**
  * @brief 电子钟驱动初始化
@@ -121,6 +122,8 @@ int clock_set_time(const rtc_time_t *time) {
     // 更新显示
     display_update_time(&g_current_time);
     
+    printf("RTC time set to %02d:%02d:%02d\n", 
+           time->hour, time->minute, time->second);
     printf("Clock time set to %02d:%02d:%02d\n", 
            g_current_time.hour, g_current_time.minute, g_current_time.second);
     return 0;
@@ -216,6 +219,11 @@ int clock_stopwatch_save_record(uint8_t record_id) {
  * @param mode 要设置的模式
  */
 void clock_set_mode(clock_mode_t mode) {
+    // 特殊处理：从设置模式切换回正常模式时，再次获取RTC时间确保显示正确
+    if (g_current_mode == CLOCK_MODE_SETTING && mode == CLOCK_MODE_NORMAL) {
+        rtc_get_time(&g_current_time);
+    }
+    
     g_current_mode = mode;
     
     // 更新显示模式
@@ -251,6 +259,21 @@ void clock_set_mode(clock_mode_t mode) {
  */
 void clock_timer_callback(interrupt_type_t type, void *data) {
     static uint8_t tick_count = 0;
+    uint32_t current_tick;
+    struct timespec ts;
+    
+    // 获取当前系统时间（以毫秒为单位）
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    current_tick = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
+    
+    // 首次调用初始化last_tick
+    if (g_last_timer_tick == 0) {
+        g_last_timer_tick = current_tick;
+    }
+    
+    // 计算实际经过的时间（毫秒）
+    uint32_t elapsed_ms = current_tick - g_last_timer_tick;
+    g_last_timer_tick = current_tick;
     
     // 每10ms调用一次
     switch (g_current_mode) {
@@ -267,16 +290,14 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
         case CLOCK_MODE_STOPWATCH:
             // 秒表模式下的处理
             if (g_stopwatch_running) {
-                // 更新秒表计时（每10ms增加10ms）
-                g_stopwatch_ms += 10;
+                // 使用实际经过的时间更新秒表，而不是假设固定10ms
+                g_stopwatch_ms += elapsed_ms;
                 
-                // 每100ms更新一次显示（减少显示刷新频率）
-                if (tick_count % 10 == 0) {
-                    display_update_stopwatch(g_stopwatch_ms);
-                }
+                // 每次更新都刷新显示，确保显示准确
+                display_update_stopwatch(g_stopwatch_ms);
             }
             
-            // 不论秒表是否运行，都需要增加tick_count并在到达100时重置
+            // 更新计数器
             if (++tick_count >= 100) {
                 tick_count = 0;
             }

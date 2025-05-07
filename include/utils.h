@@ -6,13 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
+#include <pthread_time.h>
+
 #ifdef __linux__
     #define PLATFORM_LINUX
 
     #ifndef __KERNEL__
         #include <unistd.h>
         #include <fcntl.h>
-        #include <pthread.h>
         #include <sys/ioctl.h>
         #include <sys/mman.h>
         #include <sys/io.h>

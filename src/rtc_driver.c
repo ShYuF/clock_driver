@@ -27,43 +27,6 @@ static uint8_t bin_to_bcd(uint8_t bin) {
 }
 
 /**
- * @brief 初始化RTC硬件
- * 
- * @return 0表示成功，-1表示失败
- */
-int rtc_init(void) {
-    uint8_t ctrl;
-    
-    // 读取控制寄存器
-    ctrl = pc104_read_reg(RTC_CONTROL_REG);
-    if (ctrl == (uint8_t)-1) {
-        printf("Failed to read RTC control register\n");
-        return -1;
-    }
-    
-    // 清除HALT位，启动RTC时钟
-    ctrl &= ~RTC_CTRL_HALT;
-    
-    // 清除写保护位，允许写入
-    ctrl &= ~RTC_CTRL_WP;
-    
-    // 写入控制寄存器
-    if (pc104_write_reg(RTC_CONTROL_REG, ctrl) != 0) {
-        printf("Failed to write RTC control register\n");
-        return -1;
-    }
-    
-    // 初始化时，读取一次RTC时间更新缓存
-    rtc_time_t init_time;
-    if (rtc_read_hw_time(&init_time) == 0) {
-        g_rtc_cache = init_time;
-    }
-    
-    printf("RTC initialized successfully\n");
-    return 0;
-}
-
-/**
  * @brief 从硬件直接读取RTC时间，不使用缓存
  * 
  * @param time 存储获取的时间
@@ -101,6 +64,43 @@ static int rtc_read_hw_time(rtc_time_t *time) {
     time->minute = bcd_to_bin(minute & 0x7F);
     time->hour = bcd_to_bin(hour & 0x3F);  // 24小时制
     
+    return 0;
+}
+
+/**
+ * @brief 初始化RTC硬件
+ * 
+ * @return 0表示成功，-1表示失败
+ */
+int rtc_init(void) {
+    uint8_t ctrl;
+    
+    // 读取控制寄存器
+    ctrl = pc104_read_reg(RTC_CONTROL_REG);
+    if (ctrl == (uint8_t)-1) {
+        printf("Failed to read RTC control register\n");
+        return -1;
+    }
+    
+    // 清除HALT位，启动RTC时钟
+    ctrl &= ~RTC_CTRL_HALT;
+    
+    // 清除写保护位，允许写入
+    ctrl &= ~RTC_CTRL_WP;
+    
+    // 写入控制寄存器
+    if (pc104_write_reg(RTC_CONTROL_REG, ctrl) != 0) {
+        printf("Failed to write RTC control register\n");
+        return -1;
+    }
+    
+    // 初始化时，读取一次RTC时间更新缓存
+    rtc_time_t init_time;
+    if (rtc_read_hw_time(&init_time) == 0) {
+        g_rtc_cache = init_time;
+    }
+    
+    printf("RTC initialized successfully\n");
     return 0;
 }
 

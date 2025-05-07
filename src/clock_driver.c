@@ -157,6 +157,18 @@ void clock_stopwatch_start(void) {
         return;
     }
     
+    // 重置秒表计时器，如果从暂停状态继续则保留当前值
+    if (g_stopwatch_ms == 0) {
+        printf("Stopwatch started from 0.000 seconds\n");
+    } else {
+        printf("Stopwatch resumed from %u.%03u seconds\n", g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+    }
+    
+    // 重置计时器基准点，确保从当前时间开始计时
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    g_last_timer_tick = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
+    
     g_stopwatch_running = 1;
     printf("Stopwatch started\n");
 }
@@ -173,6 +185,9 @@ void clock_stopwatch_pause(void) {
     g_stopwatch_running = 0;
     printf("Stopwatch paused at %u.%03u seconds\n", 
            g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+    
+    // 更新显示确保最终值显示正确
+    display_update_stopwatch(g_stopwatch_ms);
 }
 
 /**
@@ -183,6 +198,9 @@ void clock_stopwatch_reset(void) {
         printf("Not in stopwatch mode\n");
         return;
     }
+    
+    printf("Stopwatch reset from %u.%03u seconds to 0.000\n", 
+           g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
     
     g_stopwatch_running = 0;
     g_stopwatch_ms = 0;
@@ -278,12 +296,22 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
     // 每10ms调用一次
     switch (g_current_mode) {
         case CLOCK_MODE_NORMAL:
-        case CLOCK_MODE_SETTING:
-            // 每秒更新一次显示（100个10ms = 1秒）
+            // 在正常模式下，每秒从RTC获取一次时间（100个10ms = 1秒）
             if (++tick_count >= 100) {
                 tick_count = 0;
                 rtc_get_time(&g_current_time);
                 display_update_time(&g_current_time);
+            }
+            break;
+            
+        case CLOCK_MODE_SETTING:
+            // 在设置模式下，只更新显示，不从RTC获取时间，防止覆盖用户设置
+            if (++tick_count >= 100) {
+                tick_count = 0;
+                // 只刷新显示，使用当前内存中的时间
+                display_update_time(&g_current_time);
+                printf("Setting mode - using current memory time: %02d:%02d:%02d\n", 
+                      g_current_time.hour, g_current_time.minute, g_current_time.second);
             }
             break;
             
@@ -293,8 +321,16 @@ void clock_timer_callback(interrupt_type_t type, void *data) {
                 // 使用实际经过的时间更新秒表，而不是假设固定10ms
                 g_stopwatch_ms += elapsed_ms;
                 
-                // 每次更新都刷新显示，确保显示准确
-                display_update_stopwatch(g_stopwatch_ms);
+                // 每50ms更新一次显示，提高性能
+                if (tick_count % 5 == 0) {
+                    display_update_stopwatch(g_stopwatch_ms);
+                    
+                    // 每秒输出一次当前秒表值，便于调试
+                    if (tick_count % 100 == 0) {
+                        printf("Stopwatch running: %u.%03u seconds\n", 
+                               g_stopwatch_ms / 1000, g_stopwatch_ms % 1000);
+                    }
+                }
             }
             
             // 更新计数器

@@ -217,11 +217,32 @@ int storage_save_record(uint8_t record_id, uint32_t time_ms) {
     }
 
     uint16_t record_addr;    
+    uint32_t old_value = 0;
+    
     // 计算记录地址
     record_addr = STORAGE_RECORD_BASE_ADDR + (record_id * STORAGE_RECORD_SIZE);
     
+    // 先尝试读取原有记录
+    if (storage_read(record_addr, (uint8_t*)&old_value, sizeof(old_value)) == 0) {
+        if (old_value != 0) {
+            printf("Overwriting record #%u: old=%u.%03u, new=%u.%03u seconds\n", 
+                   record_id, old_value / 1000, old_value % 1000,
+                   time_ms / 1000, time_ms % 1000);
+        } else {
+            printf("Creating new record #%u: %u.%03u seconds\n", 
+                   record_id, time_ms / 1000, time_ms % 1000);
+        }
+    }
+    
     // 写入记录数据
-    return storage_write(record_addr, (const uint8_t*)&time_ms, sizeof(time_ms));
+    int ret = storage_write(record_addr, (const uint8_t*)&time_ms, sizeof(time_ms));
+    
+    if (ret == 0) {
+        printf("Record #%u successfully saved at address 0x%04X\n", 
+               record_id, record_addr);
+    }
+    
+    return ret;
 }
 
 /**

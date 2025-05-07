@@ -1,6 +1,11 @@
 #include "rtc_driver.h"
 #include "pc104_bus.h"
 
+// 添加内存缓存，记录最后设置的RTC时间
+static rtc_time_t g_rtc_cache = {0, 0, 0};
+// 标记RTC是否已经被手动设置过
+static int g_rtc_set_manually = 0;
+
 /**
  * @brief 将BCD码转换为二进制
  * 
@@ -48,17 +53,23 @@ int rtc_init(void) {
         return -1;
     }
     
+    // 初始化时，读取一次RTC时间更新缓存
+    rtc_time_t init_time;
+    if (rtc_read_hw_time(&init_time) == 0) {
+        g_rtc_cache = init_time;
+    }
+    
     printf("RTC initialized successfully\n");
     return 0;
 }
 
 /**
- * @brief 获取RTC当前时间
+ * @brief 从硬件直接读取RTC时间，不使用缓存
  * 
  * @param time 存储获取的时间
  * @return 0表示成功，-1表示失败
  */
-int rtc_get_time(rtc_time_t *time) {
+static int rtc_read_hw_time(rtc_time_t *time) {
     uint8_t second, minute, hour;
     
     if (time == NULL) {
@@ -91,6 +102,87 @@ int rtc_get_time(rtc_time_t *time) {
     time->hour = bcd_to_bin(hour & 0x3F);  // 24小时制
     
     return 0;
+}
+
+/**
+ * @brief 获取RTC当前时间
+ * 
+ * @param time 存储获取的时间
+ * @return 0表示成功，-1表示失败
+ */
+int rtc_get_time(rtc_time_t *time) {
+    if (time == NULL) {
+        printf("Invalid time pointer\n");
+        return -1;
+    }
+    
+    // 如果RTC已被手动设置，则使用内存缓存中的时间并更新秒数
+    if (g_rtc_set_manually) {
+        // 读取硬件时间以获取从上次设置后经过的秒数（仅在模拟环境中使用）
+        rtc_time_t hw_time;
+        static rtc_time_t last_hw_time = {0, 0, 0};
+        static struct timespec last_read_time = {0, 0};
+        struct timespec current_time;
+        
+        // 获取当前系统时间
+        clock_gettime(CLOCK_MONOTONIC, &current_time);
+        
+        // 如果距离上次读取已经过去至少1秒，则重新读取硬件时间
+        if (current_time.tv_sec - last_read_time.tv_sec >= 1) {
+            if (rtc_read_hw_time(&hw_time) == 0) {
+                // 计算自上次读取以来经过的秒数
+                int elapsed_seconds = 0;
+                
+                if (last_hw_time.hour != 0 || last_hw_time.minute != 0 || last_hw_time.second != 0) {
+                    elapsed_seconds = (hw_time.hour - last_hw_time.hour) * 3600 + 
+                                     (hw_time.minute - last_hw_time.minute) * 60 + 
+                                     (hw_time.second - last_hw_time.second);
+                    
+                    // 处理跨天情况
+                    if (elapsed_seconds < 0) {
+                        elapsed_seconds += 24 * 3600;
+                    }
+                    
+                    // 限制最大增量为10秒，防止大幅跳变
+                    if (elapsed_seconds > 10) {
+                        elapsed_seconds = 1;
+                    }
+                } else {
+                    elapsed_seconds = 1;
+                }
+                
+                // 更新缓存时间
+                g_rtc_cache.second += elapsed_seconds;
+                
+                // 处理进位
+                if (g_rtc_cache.second >= 60) {
+                    g_rtc_cache.minute += g_rtc_cache.second / 60;
+                    g_rtc_cache.second %= 60;
+                    
+                    if (g_rtc_cache.minute >= 60) {
+                        g_rtc_cache.hour += g_rtc_cache.minute / 60;
+                        g_rtc_cache.minute %= 60;
+                        
+                        if (g_rtc_cache.hour >= 24) {
+                            g_rtc_cache.hour %= 24;
+                        }
+                    }
+                }
+                
+                // 记录本次硬件时间读取
+                last_hw_time = hw_time;
+                last_read_time = current_time;
+            }
+        }
+        
+        // 返回缓存的时间
+        *time = g_rtc_cache;
+        return 0;
+    }
+    else {
+        // 如果未手动设置，则直接读取硬件时间
+        return rtc_read_hw_time(time);
+    }
 }
 
 /**
@@ -135,6 +227,12 @@ int rtc_set_time(const rtc_time_t *time) {
     // 恢复RTC时钟
     ctrl &= ~RTC_CTRL_HALT;
     pc104_write_reg(RTC_CONTROL_REG, ctrl);
+    
+    // 设置时间标志为已手动设置
+    g_rtc_set_manually = 1;
+    
+    // 更新内存缓存
+    g_rtc_cache = *time;
     
     printf("RTC time set to %02d:%02d:%02d\n", time->hour, time->minute, time->second);
     return 0;

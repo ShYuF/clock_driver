@@ -7,6 +7,52 @@ int g_pc104_fd = -1;
 void *g_pc104_io_mem = NULL;
 
 /**
+ * @brief 从I/O端口读取一个字节
+ * 
+ * @param port 端口地址
+ * @return 读取到的值，失败返回0xFF
+ */
+static uint8_t port_read_byte(uint16_t port) {
+    uint8_t value = 0xFF;
+    
+    if (g_pc104_fd < 0) return value;
+    
+    if (lseek(g_pc104_fd, port, SEEK_SET) != port) {
+        perror("lseek failed");
+        return value;
+    }
+    
+    if (read(g_pc104_fd, &value, 1) != 1) {
+        perror("read from port failed");
+    }
+    
+    return value;
+}
+
+/**
+ * @brief 向I/O端口写入一个字节
+ * 
+ * @param value 要写入的值
+ * @param port 端口地址
+ * @return 0表示成功，-1表示失败
+ */
+static int port_write_byte(uint8_t value, uint16_t port) {
+    if (g_pc104_fd < 0) return -1;
+    
+    if (lseek(g_pc104_fd, port, SEEK_SET) != port) {
+        perror("lseek failed");
+        return -1;
+    }
+    
+    if (write(g_pc104_fd, &value, 1) != 1) {
+        perror("write to port failed");
+        return -1;
+    }
+    
+    return 0;
+}
+
+/**
  * @brief 等待PC104总线就绪
  * 
  * @return 0表示成功，-1表示超时
@@ -17,7 +63,7 @@ static int pc104_wait_ready(void) {
     
     // 等待总线就绪（非忙状态）
     do {
-        status = inb(PC104_STATUS_PORT);
+        status = port_read_byte(PC104_STATUS_PORT);
         if (!(status & PC104_STATUS_BUSY)) {
             return 0; // 总线就绪
         }
@@ -36,7 +82,7 @@ static int pc104_wait_ready(void) {
 static int pc104_check_error(void) {
     uint8_t status;
     
-    status = inb(PC104_STATUS_PORT);
+    status = port_read_byte(PC104_STATUS_PORT);
     
     // 调试输出当前读取到的状态值
     printf("PC104 status register value: 0x%02X\n", status);
@@ -45,7 +91,7 @@ static int pc104_check_error(void) {
     if (status == 0xFF) {
         printf("PC104 bus initial state detected, attempting reset\n");
         // 尝试向命令端口写入复位命令(0x00)
-        outb(0x00, PC104_CMD_PORT);
+        port_write_byte(0x00, PC104_CMD_PORT);
         usleep(1000); // 等待1ms让设备有时间响应
         return 0;
     }
@@ -75,15 +121,7 @@ int pc104_init(void) {
             return -1;
         }
         
-        // 使用ioperm获取更大范围I/O端口访问权限（需要root权限）
-        if (ioperm(PC104_BASE_ADDR, 16, 1) < 0) {
-            perror("Failed to get I/O port permission");
-            close(g_pc104_fd);
-            g_pc104_fd = -1;
-            return -1;
-        }
-        
-        printf("I/O port permissions acquired successfully\n");
+        printf("Port device opened successfully\n");
     #elif defined(PLATFORM_WINDOWS)
     #elif defined(PLATFORM_UNKNOWN)
     #else
@@ -94,7 +132,7 @@ int pc104_init(void) {
     // 初始化PC104总线 - 添加重试逻辑
     while (retry_count--) {
         // 向命令端口写入复位命令(0x00)
-        outb(0x00, PC104_CMD_PORT);
+        port_write_byte(0x00, PC104_CMD_PORT);
         usleep(10000); // 等待10ms
         
         // 检查PC104总线状态
@@ -127,11 +165,11 @@ int pc104_read_reg(uint16_t addr) {
     }
     
     // 写入地址
-    outb(addr & 0xFF, PC104_ADDR_PORT);        // 低8位
-    outb((addr >> 8) & 0xFF, PC104_ADDR_PORT + 1);  // 高8位
+    port_write_byte(addr & 0xFF, PC104_ADDR_PORT);        // 低8位
+    port_write_byte((addr >> 8) & 0xFF, PC104_ADDR_PORT + 1);  // 高8位
     
     // 发送读命令
-    outb(PC104_CMD_READ, PC104_CMD_PORT);
+    port_write_byte(PC104_CMD_READ, PC104_CMD_PORT);
     
     // 等待操作完成
     if (pc104_wait_ready() != 0) {
@@ -144,7 +182,7 @@ int pc104_read_reg(uint16_t addr) {
     }
     
     // 读取数据
-    data = inb(PC104_DATA_PORT);
+    data = port_read_byte(PC104_DATA_PORT);
     
     return data;
 }
@@ -163,14 +201,14 @@ int pc104_write_reg(uint16_t addr, uint8_t data) {
     }
     
     // 写入地址
-    outb(addr & 0xFF, PC104_ADDR_PORT);        // 低8位
-    outb((addr >> 8) & 0xFF, PC104_ADDR_PORT + 1);  // 高8位
+    port_write_byte(addr & 0xFF, PC104_ADDR_PORT);        // 低8位
+    port_write_byte((addr >> 8) & 0xFF, PC104_ADDR_PORT + 1);  // 高8位
     
     // 写入数据
-    outb(data, PC104_DATA_PORT);
+    port_write_byte(data, PC104_DATA_PORT);
     
     // 发送写命令
-    outb(PC104_CMD_WRITE, PC104_CMD_PORT);
+    port_write_byte(PC104_CMD_WRITE, PC104_CMD_PORT);
     
     // 等待操作完成
     if (pc104_wait_ready() != 0) {
@@ -192,9 +230,6 @@ int pc104_write_reg(uint16_t addr, uint8_t data) {
  */
 int pc104_close(void) {
     #ifdef PLATFORM_LINUX
-        // 释放I/O端口访问权限
-        ioperm(PC104_BASE_ADDR, 4, 0);
-        
         if (g_pc104_fd >= 0) {
             close(g_pc104_fd);
             g_pc104_fd = -1;

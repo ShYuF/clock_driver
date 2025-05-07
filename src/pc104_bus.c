@@ -34,8 +34,23 @@ static int pc104_wait_ready(void) {
  * @return 0表示无错误，-1表示有错误
  */
 static int pc104_check_error(void) {
-    uint8_t status = inb(PC104_STATUS_PORT);
+    uint8_t status;
     
+    status = inb(PC104_STATUS_PORT);
+    
+    // 调试输出当前读取到的状态值
+    printf("PC104 status register value: 0x%02X\n", status);
+    
+    // 初始状态可能是0xFF，这是一个特殊情况，我们不将其视为错误
+    if (status == 0xFF) {
+        printf("PC104 bus initial state detected, attempting reset\n");
+        // 尝试向命令端口写入复位命令(0x00)
+        outb(0x00, PC104_CMD_PORT);
+        usleep(1000); // 等待1ms让设备有时间响应
+        return 0;
+    }
+    
+    // 只检查特定的错误位
     if (status & PC104_STATUS_ERROR) {
         printf("PC104 bus error detected: status=0x%02X\n", status);
         return -1; // 总线错误
@@ -50,6 +65,8 @@ static int pc104_check_error(void) {
  * @return 0表示成功，-1表示失败
  */
 int pc104_init(void) {
+    int retry_count = 3; // 添加重试机制
+    
     #ifdef PLATFORM_LINUX
         // 在Linux系统下通过/dev/port访问I/O端口
         g_pc104_fd = open("/dev/port", O_RDWR);
@@ -58,8 +75,8 @@ int pc104_init(void) {
             return -1;
         }
         
-        // 使用ioperm获取I/O端口访问权限（需要root权限）
-        if (ioperm(PC104_BASE_ADDR, 4, 1) < 0) {
+        // 使用ioperm获取更大范围I/O端口访问权限（需要root权限）
+        if (ioperm(PC104_BASE_ADDR, 16, 1) < 0) {
             perror("Failed to get I/O port permission");
             close(g_pc104_fd);
             g_pc104_fd = -1;
@@ -74,15 +91,25 @@ int pc104_init(void) {
         return -1;
     #endif
 
-    // 检查PC104总线状态
-    if (pc104_check_error() != 0) {
-        printf("PC104 bus in error state during initialization\n");
-        pc104_close();
-        return -1;
+    // 初始化PC104总线 - 添加重试逻辑
+    while (retry_count--) {
+        // 向命令端口写入复位命令(0x00)
+        outb(0x00, PC104_CMD_PORT);
+        usleep(10000); // 等待10ms
+        
+        // 检查PC104总线状态
+        if (pc104_check_error() == 0) {
+            printf("PC104 bus initialized successfully at base address 0x%X\n", PC104_BASE_ADDR);
+            return 0;
+        }
+        
+        printf("Retrying PC104 initialization, attempts left: %d\n", retry_count);
+        usleep(100000); // 重试前等待100ms
     }
     
-    printf("PC104 bus initialized successfully at base address 0x%X\n", PC104_BASE_ADDR);
-    return 0;
+    printf("PC104 bus initialization failed after multiple attempts\n");
+    pc104_close();
+    return -1;
 }
 
 /**
